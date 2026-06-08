@@ -15,15 +15,16 @@ warnings.filterwarnings("ignore")
 
 app = FastAPI(title="NanoStability AI API")
 
-app.add_middleware(CORSMiddleware,
-    allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# ── CORS — allow ALL origins explicitly
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,          # must be False when allow_origins=["*"]
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
-# ── globals set at startup
-MODEL = None
-SCALER = None
-METRICS = {}
-FEAT_IMP = []
-DATASET = None
+MODEL = None; SCALER = None; METRICS = {}; FEAT_IMP = []; DATASET = None
 
 FEATURE_COLS = [
     "n_atoms","formation_energy_eV","homo_lumo_gap_eV","binding_energy_eV",
@@ -35,7 +36,8 @@ FEATURE_COLS = [
 def train():
     global MODEL, SCALER, METRICS, FEAT_IMP, DATASET
     df = pd.read_csv("au_ag_nanocluster_stability.csv")
-    DATASET = df.to_dict(orient="records")
+    # Store as clean list — avoids NaN serialisation issues
+    DATASET = df.fillna(0).to_dict(orient="records")
 
     X = df[FEATURE_COLS].values
     y = df["stable"].values
@@ -46,38 +48,42 @@ def train():
     Xs = SCALER.fit_transform(X)
     Xtr,Xte,ytr,yte = train_test_split(Xs,y,test_size=0.2,random_state=42,stratify=y)
 
-    xgb = GradientBoostingClassifier(n_estimators=300,max_depth=4,learning_rate=0.06,subsample=0.85,random_state=42)
+    xgb = GradientBoostingClassifier(n_estimators=300,max_depth=4,
+                                      learning_rate=0.06,subsample=0.85,random_state=42)
     svm = SVC(kernel="rbf",C=2.5,probability=True,random_state=42)
-    mlp = MLPClassifier(hidden_layer_sizes=(64,32,16),max_iter=600,random_state=42,early_stopping=True,alpha=0.01)
-    MODEL = VotingClassifier(estimators=[("xgb",xgb),("svm",svm),("mlp",mlp)],voting="soft")
+    mlp = MLPClassifier(hidden_layer_sizes=(64,32,16),max_iter=600,
+                         random_state=42,early_stopping=True,alpha=0.01)
+    MODEL = VotingClassifier(
+        estimators=[("xgb",xgb),("svm",svm),("mlp",mlp)], voting="soft")
     MODEL.fit(Xtr,ytr)
 
     ypred = MODEL.predict(Xte)
     yprob = MODEL.predict_proba(Xte)[:,1]
     cv    = cross_val_score(MODEL,Xs,y,cv=5,scoring="accuracy")
 
-    xgb2 = GradientBoostingClassifier(n_estimators=300,max_depth=4,learning_rate=0.06,subsample=0.85,random_state=42)
+    xgb2 = GradientBoostingClassifier(n_estimators=300,max_depth=4,
+                                       learning_rate=0.06,subsample=0.85,random_state=42)
     xgb2.fit(Xtr,ytr)
-    FEAT_IMP = xgb2.feature_importances_.tolist()
+    FEAT_IMP = [float(x) for x in xgb2.feature_importances_]
 
     fpr,tpr,_ = roc_curve(yte,yprob)
     rep = classification_report(yte,ypred,output_dict=True)
     cm  = confusion_matrix(yte,ypred)
 
     METRICS = {
-        "accuracy":    float(accuracy_score(yte,ypred)),
-        "roc_auc":     float(roc_auc_score(yte,yprob)),
-        "cv_mean":     float(cv.mean()),
-        "cv_std":      float(cv.std()),
-        "fpr":         fpr.tolist(),
-        "tpr":         tpr.tolist(),
-        "confusion":   cm.tolist(),
-        "report":      rep,
+        "accuracy":       float(accuracy_score(yte,ypred)),
+        "roc_auc":        float(roc_auc_score(yte,yprob)),
+        "cv_mean":        float(cv.mean()),
+        "cv_std":         float(cv.std()),
+        "fpr":            [float(x) for x in fpr],
+        "tpr":            [float(x) for x in tpr],
+        "confusion":      cm.tolist(),
+        "report":         rep,
         "stable_count":   int(y.sum()),
         "unstable_count": int((y==0).sum()),
-        "total":          len(y),
+        "total":          int(len(y)),
     }
-    print("✅ Model trained")
+    print("✅ Model trained and ready")
 
 class PredictRequest(BaseModel):
     element: str
@@ -93,18 +99,27 @@ class PredictRequest(BaseModel):
     energy_above_lowest_eV: float
 
 @app.get("/")
-def root(): return {"status":"NanoStability AI API running"}
+def root():
+    return {"status": "NanoStability AI API running", "model_ready": MODEL is not None}
+
+@app.get("/health")
+def health():
+    return {"ok": True, "model_ready": MODEL is not None}
 
 @app.get("/metrics")
 def get_metrics():
-    return {**METRICS, "feature_importance": FEAT_IMP,
-            "feature_names":FEATURE_COLS+["is_gold"]}
+    return {**METRICS,
+            "feature_importance": FEAT_IMP,
+            "feature_names": FEATURE_COLS + ["is_gold"]}
 
 @app.get("/dataset")
-def get_dataset(): return {"data": DATASET}
+def get_dataset():
+    return {"data": DATASET, "count": len(DATASET)}
 
 @app.post("/predict")
 def predict(req: PredictRequest):
+    if MODEL is None:
+        return {"error": "Model not ready yet, please wait"}
     n_valence = 11 * req.n_atoms
     is_gold   = 1 if req.element.upper().startswith("AU") else 0
     arr = np.array([[req.n_atoms, req.formation_energy_eV, req.homo_lumo_gap_eV,
@@ -112,8 +127,12 @@ def predict(req: PredictRequest):
                      req.magnetic_moment_bohr, req.ionization_potential_eV,
                      req.electron_affinity_eV, n_valence,
                      req.energy_above_lowest_eV, is_gold]])
-    arr_s = SCALER.transform(arr)
-    pred  = int(MODEL.predict(arr_s)[0])
-    proba = MODEL.predict_proba(arr_s)[0].tolist()
-    return {"prediction": pred, "probability_stable": proba[1],
-            "probability_unstable": proba[0], "confidence": proba[pred]}
+    arr_s  = SCALER.transform(arr)
+    pred   = int(MODEL.predict(arr_s)[0])
+    proba  = MODEL.predict_proba(arr_s)[0].tolist()
+    return {
+        "prediction":           pred,
+        "probability_stable":   float(proba[1]),
+        "probability_unstable": float(proba[0]),
+        "confidence":           float(proba[pred]),
+    }

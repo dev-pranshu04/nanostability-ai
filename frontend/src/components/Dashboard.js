@@ -55,7 +55,7 @@ export default function Dashboard({ dataset }) {
 
   return (
     <div>
-      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2rem', color: '#e8d5b7', marginBottom: '0.3rem' }}>📊 Dataset Dashboard</div>
+      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2rem', color: '#e8d5b7', marginBottom: '0.3rem' }}>Dataset Dashboard</div>
       <div style={{ color: '#4b5563', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Explore the 200-sample DFT-curated nanocluster dataset.</div>
 
       {/* Filters */}

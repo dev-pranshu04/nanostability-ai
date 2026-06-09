@@ -52,6 +52,7 @@ export default function App() {
 
   // Animated dots
   useEffect(() => {
+    fetch(`${API_URL}/health`).catch(() => {});
     if (status !== 'loading') return;
     const t = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 500);
     return () => clearInterval(t);

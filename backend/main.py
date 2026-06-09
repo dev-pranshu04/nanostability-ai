@@ -56,7 +56,8 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"ok": True, "model_ready": True}
+    # return {"ok": True, "model_ready": True}
+    return {"status": "ok"}
 
 
 @app.get("/metrics")

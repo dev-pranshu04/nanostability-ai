@@ -10,7 +10,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://nanostability-ai.onren
 export { API_URL };
 
 const NAV = [
-  { id: 'overview',  label: 'Overview',      icon: '⚛' },
+  { id: 'overview',  label: 'Overview' },
   { id: 'predict',   label: 'Predict' },
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'metrics',   label: 'Model Metrics' },

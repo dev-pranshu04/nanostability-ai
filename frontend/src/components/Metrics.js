@@ -29,7 +29,7 @@ export default function Metrics({ metrics }) {
 
   return (
     <div>
-      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2rem', color: '#e8d5b7', marginBottom: '0.3rem' }}>📈 Model Performance</div>
+      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2rem', color: '#e8d5b7', marginBottom: '0.3rem' }}>Model Performance</div>
       <div style={{ color: '#4b5563', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Detailed evaluation of the XGBoost + SVM + Neural Network ensemble.</div>
 
       {/* KPIs */}
@@ -49,7 +49,7 @@ export default function Metrics({ metrics }) {
 
       {/* Info box */}
       <div style={{ background: '#060f1a', border: '1px solid #0d2137', borderRadius: 10, padding: '1rem 1.2rem', marginBottom: '1.5rem', fontSize: '0.85rem', color: '#6b7280', lineHeight: 1.8 }}>
-        <span style={{ color: '#10b981', fontWeight: 600 }}>✅ Why these scores are trustworthy: </span>
+        <span style={{ color: '#10b981', fontWeight: 600 }}>Why these scores are trustworthy: </span>
         The model achieves ~80% accuracy rather than 100% because stability depends on the <em>combination</em> of 11 features with inherent DFT uncertainty (~8% label noise). A perfect score on 200 samples signals data leakage — not genuine learning.
         <strong style={{ color: '#9ca3af' }}> 5-Fold CV: {(cv_mean * 100).toFixed(2)}% ± {(cv_std * 100).toFixed(2)}%</strong>
       </div>

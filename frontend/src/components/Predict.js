@@ -43,7 +43,7 @@ export default function Predict() {
 
   return (
     <div style={{ maxWidth: 960 }}>
-      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2rem', color: '#e8d5b7', marginBottom: '0.3rem' }}>🔬 Predict Stability</div>
+      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2rem', color: '#e8d5b7', marginBottom: '0.3rem' }}>Predict Stability</div>
       <div style={{ color: '#4b5563', fontSize: '0.9rem', marginBottom: '1.5rem' }}>Enter the DFT-computed properties of your nanocluster.</div>
 
       <div style={card}>
@@ -111,7 +111,7 @@ export default function Predict() {
           {/* Result card */}
           <div style={{ ...card, background: stable ? 'linear-gradient(135deg,#022c22,#064e3b)' : 'linear-gradient(135deg,#2d0a0a,#450a0a)', border: `1px solid ${stable ? '#10b981' : '#ef4444'}`, textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2rem', fontWeight: 700, color: stable ? '#10b981' : '#ef4444', marginBottom: '0.5rem' }}>
-              {stable ? '✅ STABLE' : '❌ UNSTABLE'}
+              {stable ? 'STABLE' : 'UNSTABLE'}
             </div>
             <div style={{ color: '#9ca3af' }}>Model confidence: <strong style={{ color: '#e8d5b7' }}>{(result.confidence * 100).toFixed(1)}%</strong></div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '2.5rem', marginTop: '1.2rem' }}>

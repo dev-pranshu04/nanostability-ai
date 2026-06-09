@@ -11,9 +11,9 @@ export { API_URL };
 
 const NAV = [
   { id: 'overview',  label: 'Overview',      icon: '⚛' },
-  { id: 'predict',   label: 'Predict',        icon: '🔬' },
-  { id: 'dashboard', label: 'Dashboard',      icon: '📊' },
-  { id: 'metrics',   label: 'Model Metrics',  icon: '📈' },
+  { id: 'predict',   label: 'Predict' },
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'metrics',   label: 'Model Metrics' },
 ];
 
 const S = {

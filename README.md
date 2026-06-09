@@ -1,2 +1,0 @@
-# nanostability-ai
-Pending

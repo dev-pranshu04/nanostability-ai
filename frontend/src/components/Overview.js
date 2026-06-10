@@ -1,110 +1,114 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-const TT = ({ active, payload, label }) =>
-  active && payload?.length ? (
-    <div style={{ background: '#0f1117', border: '1px solid #1f2937', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#e8d5b7' }}>
-      <div>{label}</div>
-      <div style={{ color: '#3b82f6' }}>{payload[0].value} clusters</div>
-    </div>
-  ) : null;
+const STATS = [
+  { label: 'Total Samples', value: '600', sub: '200 anchored + 400 synthetic' },
+  { label: 'Test Accuracy', value: '85%', sub: 'Ensemble (XGB + SVM + MLP)' },
+  { label: 'ROC-AUC', value: '0.912', sub: '5-Fold CV: 77.5% ± 5.2%' },
+  { label: 'Core Features', value: '11', sub: '26 total (11 complete across all rows)' },
+];
 
-export default function Overview({ metrics, dataset }) {
-  if (!metrics) return null;
+const FEATURES = [
+  { name: 'homo_lumo_gap_eV', desc: 'Primary stability indicator — wider gap = more stable' },
+  { name: 'formation_energy_eV_per_atom', desc: 'Thermodynamic stability relative to bulk atoms' },
+  { name: 'binding_energy_eV_per_atom', desc: 'Cohesive strength of the cluster' },
+  { name: 'coordination_number', desc: 'Average bonds per atom — higher = more bulk-like' },
+  { name: 'ionization_potential_eV', desc: 'Energy to remove an electron (Koopmans\' theorem)' },
+  { name: 'electron_affinity_eV', desc: 'Energy gained by adding an electron' },
+  { name: 'chemical_hardness_eV', desc: '(IP − EA) / 2 — HSAB principle; harder = more stable' },
+  { name: 'electronegativity_eV', desc: '(IP + EA) / 2 — Mulliken electronegativity' },
+  { name: 'au_fraction', desc: 'Compositional descriptor; captures relativistic Au effects' },
+  { name: 'n_atoms', desc: 'Cluster size (3–20 atoms)' },
+  { name: 'n_valence_electrons', desc: 'Total valence electrons; relates to jellium shell filling' },
+];
 
-  const barData = [
-    { name: 'Stable',   value: metrics.stable_count,   fill: '#10b981' },
-    { name: 'Unstable', value: metrics.unstable_count, fill: '#ef4444' },
-  ];
-
+export default function Overview() {
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
 
-      {/* Hero */}
-      <div style={{ background: 'linear-gradient(135deg,#0a0a1f,#0d1b3e,#0a1628)', border: '1px solid #1a2a4a', borderRadius: 20, padding: '2.5rem 3rem', marginBottom: '2rem', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -60, right: -60, width: 300, height: 300, background: 'radial-gradient(circle,rgba(59,130,246,0.08),transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2.6rem', color: '#e8d5b7', marginBottom: '0.5rem', letterSpacing: '-1px' }}>
-          ⚛ NanoStability AI
-        </div>
-        <div style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '1.2rem' }}>
-          Physics-Informed Machine Learning for Gold & Silver Nanocluster Stability Prediction
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {['XGBoost', 'SVM', 'Neural Network', 'DFT Features', 'NSUT 2025'].map(b => (
-            <span key={b} style={{ background: 'rgba(30,58,95,0.6)', color: '#7eb8f7', border: '1px solid #1e3a5f', borderRadius: 20, padding: '4px 14px', fontSize: '0.72rem', fontFamily: "'Space Mono', monospace" }}>
-              {b}
-            </span>
-          ))}
-        </div>
-      </div>
+      {/* Header */}
+      <h1 style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+        ⚛️ NanoStability AI
+      </h1>
+      <p style={{ color: '#666', marginBottom: '2rem', lineHeight: 1.6 }}>
+        Physics-informed ML ensemble for predicting thermodynamic stability of bimetallic
+        Au/Ag nanoclusters (3–20 atoms). Trained on a 600-sample literature-informed dataset
+        combining anchored DFT literature values with physics-constrained synthetic data.
+      </p>
 
-      {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem', marginBottom: '2rem' }}>
-        {[
-          { v: `${(metrics.cv_mean * 100).toFixed(1)}%`, l: 'CV Accuracy',    c: '#3b82f6' },
-          { v: metrics.roc_auc.toFixed(3),               l: 'ROC-AUC Score',  c: '#8b5cf6' },
-          { v: metrics.total,                             l: 'DFT Samples',    c: '#f59e0b' },
-          { v: '3',                                       l: 'ML Models',      c: '#10b981' },
-        ].map(({ v, l, c }) => (
-          <div key={l} style={{ background: '#080818', border: '1px solid #12122a', borderRadius: 14, padding: '1.4rem', textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '2.2rem', fontWeight: 700, color: c }}>{v}</div>
-            <div style={{ fontSize: '0.72rem', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6 }}>{l}</div>
+      {/* Stats grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+        {STATS.map(s => (
+          <div key={s.label} style={{
+            background: '#f8f9fa', borderRadius: '8px', padding: '1.2rem',
+            borderLeft: '4px solid #2563eb'
+          }}>
+            <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {s.label}
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1e40af', margin: '0.25rem 0' }}>
+              {s.value}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#888' }}>{s.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Body */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
-        <div style={{ background: '#080818', border: '1px solid #12122a', borderRadius: 14, padding: '1.5rem' }}>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '0.72rem', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '1rem' }}>What This Tool Does</div>
-          <div style={{ color: '#9ca3af', fontSize: '0.9rem', lineHeight: 1.8 }}>
-            Nanoclusters — tiny groups of <strong style={{ color: '#e8d5b7' }}>3 to 20 atoms</strong> — behave very
-            differently from bulk metals. Whether a gold or silver nanocluster is{' '}
-            <strong style={{ color: '#10b981' }}>stable</strong> depends on its quantum-mechanical
-            electronic structure, which takes <strong style={{ color: '#e8d5b7' }}>hours</strong> to compute
-            using traditional DFT simulations.
-            <br /><br />
-            This tool uses a <strong style={{ color: '#93c5fd' }}>physics-informed ML ensemble</strong> trained
-            on 200 DFT-curated samples to predict stability in milliseconds — replacing expensive
-            quantum computation with interpretable machine learning.
-            <br /><br />
-            <strong style={{ color: '#e8d5b7' }}>No single feature predicts stability.</strong> The model
-            weighs all 11 DFT features together — electronic structure, thermodynamics, geometry,
-            and quantum shell-closure effects.
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ background: '#080818', border: '1px solid #12122a', borderRadius: 14, padding: '1.3rem' }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: '0.72rem', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: '1rem' }}>Dataset Split</div>
-            <ResponsiveContainer width="100%" height={130}>
-              <BarChart data={barData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<TT />} />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {barData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div style={{ background: '#0a0f1e', border: '1px solid #1a2a4a', borderRadius: 10, padding: '1.2rem', fontSize: '0.82rem', color: '#9ca3af', lineHeight: 2 }}>
-            <div style={{ color: '#e8d5b7', fontWeight: 600, marginBottom: '0.4rem' }}>Stability Criteria</div>
-            {[
-              { c: '#3b82f6', t: 'HOMO-LUMO Gap > 0.5 eV' },
-              { c: '#f59e0b', t: 'Formation Energy < −1.0 eV/atom' },
-              { c: '#10b981', t: 'Magic-number shell closure' },
-              { c: '#8b5cf6', t: 'Binding energy & isomer quality' },
-            ].map(({ c, t }) => (
-              <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0, display: 'inline-block' }} />
-                <span style={{ fontSize: '0.8rem' }}>{t}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Dataset provenance */}
+      <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: '8px', padding: '1rem', marginBottom: '2rem' }}>
+        <strong>Dataset Provenance</strong>
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.875rem', color: '#555', lineHeight: 1.6 }}>
+          600 samples across two sources: <strong>200 literature-anchored rows</strong> (56 digitised
+          from Manna et al. 2023, Gruene et al. 2008, Häkkinen et al. 2008, Xing et al. 2006,
+          Chaban 2016 + 144 physics-interpolated) and <strong>400 physics-constrained synthetic rows</strong>.
+          Neither source is raw DFT output — all feature ranges are grounded in published values.
+          A <code>data_source</code> column tags every row for full transparency.
+          Class distribution: 67.7% stable / 32.3% unstable.
+        </p>
       </div>
+
+      {/* Model architecture */}
+      <h2 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '1rem' }}>Model Architecture</h2>
+      <div style={{ background: '#f0f9ff', borderRadius: '8px', padding: '1rem', marginBottom: '2rem', fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: 1.8 }}>
+        <div>Input (11 core features)</div>
+        <div style={{ paddingLeft: '1rem', color: '#2563eb' }}>├── XGBoost (300 trees, max_depth=4)</div>
+        <div style={{ paddingLeft: '1rem', color: '#7c3aed' }}>├── SVM (RBF kernel, C=10)</div>
+        <div style={{ paddingLeft: '1rem', color: '#059669' }}>└── MLP (64→32→16, ReLU, Dropout=0.2)</div>
+        <div style={{ marginTop: '0.5rem', color: '#d97706' }}>→ Soft Voting → Stability Prediction (0/1)</div>
+      </div>
+
+      {/* Features table */}
+      <h2 style={{ fontSize: '1.2rem', fontWeight: 600, marginBottom: '1rem' }}>Core Features</h2>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+        <thead>
+          <tr style={{ background: '#f1f5f9' }}>
+            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', borderBottom: '2px solid #e2e8f0' }}>Feature</th>
+            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', borderBottom: '2px solid #e2e8f0' }}>Physical meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          {FEATURES.map((f, i) => (
+            <tr key={f.name} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+              <td style={{ padding: '0.5rem 0.75rem', fontFamily: 'monospace', color: '#1e40af', whiteSpace: 'nowrap' }}>
+                {f.name}
+              </td>
+              <td style={{ padding: '0.5rem 0.75rem', color: '#444' }}>{f.desc}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Limitations */}
+      <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', marginTop: '2rem' }}>
+        <strong>⚠️ Limitations</strong>
+        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.5rem', fontSize: '0.875rem', color: '#555', lineHeight: 1.8 }}>
+          <li>Dataset is literature-informed computational data — not raw DFT simulations</li>
+          <li>Label function (3-criterion threshold) derived from published stability criteria — not actual energy minimisation</li>
+          <li>68% agreement between the two source label functions; original 200 labels preserved as anchor</li>
+          <li>CV accuracy 77.5% vs test accuracy 85% — gap warrants caution on small dataset</li>
+          <li>Not validated for production nanoscience applications</li>
+        </ul>
+      </div>
+
     </div>
   );
 }

@@ -1,172 +1,225 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://nanostability-ai.onrender.com';
 
-// Fallback static metrics (matches metrics.json)
-const STATIC_METRICS = {
-  dataset: {
-    total_samples: 600,
-    stable: 406,
-    unstable: 194,
-    stable_pct: 67.7,
-    unstable_pct: 32.3,
-    n_features_core: 11,
-    n_features_total: 26,
+// The 11 core features — all present in every row of the merged dataset
+const FIELDS = [
+  {
+    key: 'homo_lumo_gap_eV',
+    label: 'HOMO-LUMO Gap (eV)',
+    placeholder: '0.1 – 2.1',
+    min: 0.0, max: 3.0, step: 0.001,
+    hint: 'Primary stability indicator. Typical Au/Ag range: 0.1–2.1 eV',
   },
-  model: {
-    type: 'VotingClassifier (XGBoost + SVM + MLP)',
-    voting: 'soft',
-    test_accuracy: 0.85,
-    roc_auc: 0.912,
-    cv_accuracy_mean: 0.775,
-    cv_accuracy_std: 0.052,
-    cv_folds: 5,
-    precision_stable: 0.87,
-    recall_stable: 0.96,
-    f1_stable: 0.91,
-    precision_unstable: 0.79,
-    recall_unstable: 0.53,
-    f1_unstable: 0.63,
+  {
+    key: 'formation_energy_eV_per_atom',
+    label: 'Formation Energy (eV/atom)',
+    placeholder: '-3.0 – -0.05',
+    min: -4.0, max: 0.0, step: 0.001,
+    hint: 'More negative = more thermodynamically stable',
   },
-  top_features: [
-    { feature: 'homo_lumo_gap_eV', importance: 0.31 },
-    { feature: 'formation_energy_eV_per_atom', importance: 0.24 },
-    { feature: 'binding_energy_eV_per_atom', importance: 0.19 },
-    { feature: 'chemical_hardness_eV', importance: 0.11 },
-    { feature: 'coordination_number', importance: 0.08 },
-    { feature: 'au_fraction', importance: 0.07 },
-  ],
+  {
+    key: 'binding_energy_eV_per_atom',
+    label: 'Binding Energy (eV/atom)',
+    placeholder: '0.6 – 3.5',
+    min: 0.0, max: 5.0, step: 0.001,
+    hint: 'Au clusters: ~1.5–3.2; Ag clusters: ~0.8–2.8',
+  },
+  {
+    key: 'coordination_number',
+    label: 'Coordination Number',
+    placeholder: '1.5 – 12.0',
+    min: 0.0, max: 12.0, step: 0.01,
+    hint: 'Average bonds per atom. Higher = more bulk-like',
+  },
+  {
+    key: 'ionization_potential_eV',
+    label: 'Ionization Potential (eV)',
+    placeholder: '6.5 – 8.8',
+    min: 5.0, max: 12.0, step: 0.001,
+    hint: 'Energy to remove one electron',
+  },
+  {
+    key: 'electron_affinity_eV',
+    label: 'Electron Affinity (eV)',
+    placeholder: '1.8 – 3.8',
+    min: 0.0, max: 6.0, step: 0.001,
+    hint: 'Energy gained by adding one electron',
+  },
+  {
+    key: 'chemical_hardness_eV',
+    label: 'Chemical Hardness (eV)',
+    placeholder: '0.3 – 1.5',
+    min: 0.0, max: 4.0, step: 0.001,
+    hint: '(IP − EA) / 2 — HSAB principle. Higher = more stable',
+  },
+  {
+    key: 'electronegativity_eV',
+    label: 'Electronegativity (eV)',
+    placeholder: '4.5 – 8.0',
+    min: 0.0, max: 12.0, step: 0.001,
+    hint: '(IP + EA) / 2 — Mulliken electronegativity',
+  },
+  {
+    key: 'au_fraction',
+    label: 'Au Fraction',
+    placeholder: '0.0 – 1.0',
+    min: 0.0, max: 1.0, step: 0.001,
+    hint: '0 = pure Ag, 1 = pure Au, 0.5 = equal mix',
+  },
+  {
+    key: 'n_atoms',
+    label: 'Number of Atoms',
+    placeholder: '3 – 20',
+    min: 2, max: 30, step: 1,
+    hint: 'Cluster size. Model trained on n = 3–20',
+  },
+  {
+    key: 'n_valence_electrons',
+    label: 'Total Valence Electrons',
+    placeholder: 'n_atoms × 11',
+    min: 1, max: 250, step: 1,
+    hint: 'Au and Ag both have 11 valence electrons. For pure clusters: n_atoms × 11',
+  },
+];
+
+const EXAMPLE = {
+  homo_lumo_gap_eV: 0.91,
+  formation_energy_eV_per_atom: -1.42,
+  binding_energy_eV_per_atom: 2.35,
+  coordination_number: 5.2,
+  ionization_potential_eV: 7.64,
+  electron_affinity_eV: 2.73,
+  chemical_hardness_eV: 2.455,
+  electronegativity_eV: 5.185,
+  au_fraction: 0.5,
+  n_atoms: 12,
+  n_valence_electrons: 132,
 };
 
-function MetricCard({ label, value, sub, color = '#2563eb', warn = false }) {
-  return (
-    <div style={{
-      background: warn ? '#fffbeb' : '#f8f9fa',
-      border: `1px solid ${warn ? '#f59e0b' : '#e2e8f0'}`,
-      borderRadius: '8px', padding: '1rem',
-      borderLeft: `4px solid ${color}`,
-    }}>
-      <div style={{ fontSize: '0.75rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-      <div style={{ fontSize: '1.8rem', fontWeight: 700, color, margin: '0.25rem 0' }}>{value}</div>
-      {sub && <div style={{ fontSize: '0.75rem', color: warn ? '#92400e' : '#aaa' }}>{sub}</div>}
-    </div>
-  );
-}
+export default function Predict() {
+  const [form, setForm] = useState({});
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-function ClassReport({ label, precision, recall, f1, color }) {
-  return (
-    <tr>
-      <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color }}>{label}</td>
-      <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center' }}>{precision.toFixed(2)}</td>
-      <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center' }}>{recall.toFixed(2)}</td>
-      <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center' }}>{f1.toFixed(2)}</td>
-    </tr>
-  );
-}
+  const handleChange = (key, val) => {
+    setForm(prev => ({ ...prev, [key]: val }));
+  };
 
-export default function Metrics() {
-  const [metrics, setMetrics] = useState(STATIC_METRICS);
-  const [fromAPI, setFromAPI] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const loadExample = () => {
+    setForm(EXAMPLE);
+    setResult(null);
+    setError(null);
+  };
 
-  useEffect(() => {
-    fetch(`${API_URL}/metrics`)
-      .then(r => r.json())
-      .then(data => {
-        setMetrics(data);
-        setFromAPI(true);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  const handleSubmit = async () => {
+    setLoading(true);
+    setResult(null);
+    setError(null);
+    try {
+      const payload = {};
+      FIELDS.forEach(f => {
+        payload[f.key] = parseFloat(form[f.key]);
+      });
+      const res = await fetch(`${API_URL}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const m = metrics.model;
-  const d = metrics.dataset;
+  const allFilled = FIELDS.every(f => form[f.key] !== undefined && form[f.key] !== '');
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Model Performance</h2>
-        <span style={{
-          fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '999px',
-          background: fromAPI ? '#dcfce7' : '#f1f5f9',
-          color: fromAPI ? '#166534' : '#64748b'
-        }}>
-          {loading ? 'Fetching…' : fromAPI ? '● Live from API' : '○ Static fallback'}
-        </span>
-      </div>
-      <p style={{ color: '#666', marginBottom: '2rem', fontSize: '0.9rem' }}>
-        Trained on {d.total_samples} samples. Evaluated on a held-out test split.
-        {' '}<strong>Note:</strong> 7.5% gap between CV (77.5%) and test accuracy (85%) — see caveats below.
+    <div style={{ padding: '2rem', maxWidth: '700px', margin: '0 auto' }}>
+      <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.5rem' }}>Predict Stability</h2>
+      <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+        Enter all 11 core features for an Au/Ag nanocluster. The ensemble model (XGBoost + SVM + MLP)
+        returns a stability prediction and probability.
       </p>
 
-      {/* Primary metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-        <MetricCard label="Test Accuracy" value={`${(m.test_accuracy * 100).toFixed(1)}%`} color="#2563eb" />
-        <MetricCard label="ROC-AUC" value={m.roc_auc.toFixed(3)} color="#7c3aed" />
-        <MetricCard
-          label={`${m.cv_folds}-Fold CV Accuracy`}
-          value={`${(m.cv_accuracy_mean * 100).toFixed(1)}%`}
-          sub={`± ${(m.cv_accuracy_std * 100).toFixed(1)}% — gap vs test accuracy warrants caution`}
-          color="#d97706"
-          warn={true}
-        />
-        <MetricCard label="Dataset Size" value={d.total_samples} sub={`${d.n_features_core} core features, ${d.n_features_total} total columns`} color="#059669" />
-      </div>
+      <button
+        onClick={loadExample}
+        style={{
+          marginBottom: '1.5rem', padding: '0.4rem 1rem', fontSize: '0.85rem',
+          background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px',
+          cursor: 'pointer',
+        }}
+      >
+        Load example (Au₆Ag₆, n=12)
+      </button>
 
-      {/* Per-class report */}
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.2rem', marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>Classification Report</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-          <thead>
-            <tr style={{ background: '#f1f5f9' }}>
-              <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem', borderBottom: '2px solid #e2e8f0' }}>Class</th>
-              <th style={{ textAlign: 'center', padding: '0.5rem 0.75rem', borderBottom: '2px solid #e2e8f0' }}>Precision</th>
-              <th style={{ textAlign: 'center', padding: '0.5rem 0.75rem', borderBottom: '2px solid #e2e8f0' }}>Recall</th>
-              <th style={{ textAlign: 'center', padding: '0.5rem 0.75rem', borderBottom: '2px solid #e2e8f0' }}>F1-Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            <ClassReport label="Stable (1)" precision={m.precision_stable} recall={m.recall_stable} f1={m.f1_stable} color="#16a34a" />
-            <ClassReport label="Unstable (0)" precision={m.precision_unstable} recall={m.recall_unstable} f1={m.f1_unstable} color="#dc2626" />
-          </tbody>
-        </table>
-        <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.75rem' }}>
-          Low recall on Unstable (0.53) — model favours the majority class. Expected given 67.7/32.3 class split.
-          Consider threshold tuning or class weighting if false negatives are costly.
-        </p>
-      </div>
-
-      {/* Feature importance */}
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.2rem', marginBottom: '2rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>XGBoost Feature Importance</h3>
-        {metrics.top_features.map(f => (
-          <div key={f.feature} style={{ marginBottom: '0.6rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
-              <span style={{ fontFamily: 'monospace' }}>{f.feature}</span>
-              <span style={{ color: '#666' }}>{(f.importance * 100).toFixed(0)}%</span>
-            </div>
-            <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px' }}>
-              <div style={{ height: '100%', width: `${(f.importance / 0.35) * 100}%`, background: '#2563eb', borderRadius: '4px' }} />
-            </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+        {FIELDS.map(f => (
+          <div key={f.key}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
+              {f.label}
+            </label>
+            <input
+              type="number"
+              min={f.min} max={f.max} step={f.step}
+              placeholder={f.placeholder}
+              value={form[f.key] ?? ''}
+              onChange={e => handleChange(f.key, e.target.value)}
+              style={{
+                width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.9rem',
+                border: '1px solid #d1d5db', borderRadius: '6px',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '0.2rem' }}>{f.hint}</div>
           </div>
         ))}
-        <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.75rem' }}>
-          HOMO-LUMO gap as top feature is physically consistent with Coquet et al. (2008).
-        </p>
       </div>
 
-      {/* Caveats */}
-      <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem' }}>
-        <strong>⚠️ Interpretation Caveats</strong>
-        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.5rem', fontSize: '0.85rem', color: '#555', lineHeight: 1.8 }}>
-          <li><strong>CV vs test gap (7.5%)</strong> — on 600 samples this may reflect test-set variance, not generalisation. Treat 85% as an upper bound.</li>
-          <li><strong>Label function overlap with features</strong> — the stability label is partly derived from three input features. This can inflate accuracy; interpret metrics accordingly.</li>
-          <li><strong>Class imbalance</strong> — recall on Unstable class (0.53) is low. The model correctly identifies most stable clusters but misses ~half of unstable ones.</li>
-          <li><strong>Data provenance</strong> — 600 samples are literature-informed computational data, not raw DFT. Metrics reflect performance on the same distribution, not real nanocluster experiments.</li>
-        </ul>
-      </div>
+      <button
+        onClick={handleSubmit}
+        disabled={!allFilled || loading}
+        style={{
+          width: '100%', padding: '0.75rem', fontSize: '1rem', fontWeight: 600,
+          background: allFilled && !loading ? '#2563eb' : '#93c5fd',
+          color: '#fff', border: 'none', borderRadius: '8px',
+          cursor: allFilled && !loading ? 'pointer' : 'not-allowed',
+        }}
+      >
+        {loading ? 'Predicting…' : 'Predict Stability'}
+      </button>
 
+      {error && (
+        <div style={{ marginTop: '1rem', padding: '1rem', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#dc2626' }}>
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <div style={{
+          marginTop: '1.5rem', padding: '1.5rem', borderRadius: '8px',
+          background: result.stable === 1 ? '#f0fdf4' : '#fef2f2',
+          border: `2px solid ${result.stable === 1 ? '#22c55e' : '#ef4444'}`,
+        }}>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: result.stable === 1 ? '#16a34a' : '#dc2626' }}>
+            {result.stable === 1 ? '✅ Stable' : '❌ Unstable'}
+          </div>
+          {result.probability !== undefined && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#555' }}>
+              Confidence: <strong>{(result.probability * 100).toFixed(1)}%</strong>
+            </div>
+          )}
+          <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.75rem' }}>
+            Prediction from VotingClassifier ensemble. Trained on 600 literature-informed samples.
+            For research/educational use only — not validated for production nanoscience.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
